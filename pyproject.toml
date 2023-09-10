@@ -1,0 +1,46 @@
+[project]
+name = "test name"
+required_version=">=3.10<4"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+testpaths = [
+    "project/tests",
+]
+required_plugins = []
+addopts = "-W ignore::DeprecationWarning"
+
+[tool.black]
+line-length = 120
+target-version = ["py310"]
+include = "project/"
+exclude = "(__pycache__|.mypy_cache|.pytest_cache|.idea|venv|.venv|.coverage|coverage.xml)"
+
+[tool.coverage.run]
+command_line = "-m pytest"
+
+[tool.coverage.report]
+omit = [
+    "*test*",
+    "*cache*",
+    "main.py",
+    "project/logger.py",
+    "project/monitoring.py",
+]
+precision = "2"
+fail_under = "80.00"
+
+[tool. mypy]
+python_version = "3.10"
+packages = [
+    "project",
+]
+exclude = [
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+]
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
