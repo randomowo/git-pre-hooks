@@ -1,0 +1,121 @@
+#!/bin/bash
+
+SRC_ROOT=project
+
+if [[ -z "$(git tag --contains HEAD)" ]]; then
+    echo "Commint must be tagged"
+    exit 1
+fi
+
+if [[ ! -f ".gitignore" ]]; then
+    echo "Repo must have not empty .gitignore file"
+    exit 1
+fi
+
+UNTRACKED=$(git ls-files -m -o --exclude-standard)
+
+if [[ "${UNTRACKED[*]}" =~ ".gitignore" ]]; then
+    echo ".gitignore can not be untracked"
+    exit 1
+fi
+
+GITIGNORE=($(cat .gitignore))
+PROJECT_TYPES=()
+
+for ext in "go" "py"; do
+    if [ -n "$(find . -name "*.${ext}" -type f)" ]; then
+        PROJECT_TYPES+=($ext)
+    fi
+done
+
+if [[ "${PROJECT_TYPES[*]}" =~ "go" ]]; then
+    if [[ ! -f "go.mod" ]] || [[ -z "$(cat go.mod)" ]]; then
+        echo "golang project must contains not empty go.mod file"
+        exit 1
+    fi
+    # TODO
+fi
+
+if [[ "${PROJECT_TYPES[*]}" =~ "py" ]]; then
+    if [[ ! -f "pyproject.toml" ]] || [[ -z "$(cat pyproject.toml)" ]]; then
+        echo "python project must contains not empty pyproject.toml file"
+        exit 1
+    fi
+
+    if [[ ! -f "requirements.txt" ]] || [[ -z "$(cat requirements.txt)" ]]; then
+        echo "python project must contains not empty requirements.txt file"
+        exit 1
+    fi
+
+    REQUIREMENTS=($(cat requirements.txt))
+
+    for req_item in \
+        "pytest" \
+        "coverage[toml]" \
+        "mypy" \
+        "black" \
+    ; do
+        if [[ ! "${REQUIREMENTS[*]}" =~ "$req_item" ]]; then
+            echo "requirements.txt must contains $req_item"
+            exit 1
+        fi
+    done
+
+    for ignore_file in \
+        "venv" \
+        ".venv" \
+        "__pycache__" \
+        ".mypy_cache" \
+        ".pytest_cache" \
+        ".coverage" \
+        "coverage.xml"\
+    ; do
+        if [[ ! "${GITIGNORE[*]}" =~ "$ignore_file" ]]; then
+            echo "python project repo must contains $ignore_file in .gitignore"
+            exit 1
+        fi
+    done
+
+
+    if [[ ! -f ".venv" ]]; then
+        python -m venv .venv
+    fi
+
+    bash .venv/bin/activate
+    pip install -r requirements.txt >/dev/null 2>&1
+
+    if ! black . --check >/dev/null 2>&1; then
+        echo "black check not passed"
+        exit 1
+    fi
+
+    if ! pytest >/dev/null 2>&1; then
+        echo "pytest failed"
+        exit 1
+    fi
+
+    coverage run >/dev/null 2>&1
+    if ! coverage report >/dev/null 2>&1; then
+        echo "coverage below 80%"
+        exit 1
+    fi
+
+    if ! mypy >/dev/null 2>&1; then
+        echo "mypy have errors"
+        exit 1
+    fi
+
+    if [[ "${UNTRACKED[*]}" =~ "requirements.txt" ]]; then
+        echo "you have uncommited requirements.txt"
+        exit 1
+    fi
+
+fi
+
+if [[ "${UNTRACKED[*]}" =~ "project/" ]]; then
+    echo "you have uncommited project files:"
+    echo "$UNTRACKED" | grep "project/"
+    exit 1
+fi
+
+# TODO: улучшить проверку, иначе может пройти пуш, а файлы незакомичены (мб через git diff)
