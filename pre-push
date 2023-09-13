@@ -2,6 +2,11 @@
 
 SRC_ROOT=project
 
+if [[ "$(git config push.followTags)" != "true" ]]; then
+    echo "push.followTags is not true. run \`git config push.followTags true\` to enable"
+    exit 1
+fi
+
 if [[ -z "$(git tag --contains HEAD)" ]]; then
     echo "Commint must be tagged"
     exit 1
